@@ -9,19 +9,22 @@
 using namespace std;
 
 // Force 1-byte alignment for the custom header.
+
+//a pragma is a preprocessor directive that provides additional information to the compiler.
+//uint8_t is an unsigned integer type that is guaranteed to be 8 bits (1 byte) in size.
 #pragma pack(push, 1)
 struct CustomHeader {
     uint16_t srcPort;     // Source Port (2 bytes)
     uint16_t destPort;    // Destination Port (2 bytes)
     uint32_t seqNum;      // Sequence Number (4 bytes)
-    uint8_t  ackFlag;     // ACK Flag (1 byte)
-    uint8_t  synFlag;     // SYN Flag (1 byte)
-    uint8_t  finFlag;     // FIN Flag (1 byte)
+    uint8_t  ackFlag;     // ACK Flag (1 byte) 
+    uint8_t  synFlag;     // SYN Flag (1 byte) 
+    uint8_t  finFlag;     // FIN Flag (1 byte) 
     uint16_t payloadSize; // Payload Size (2 bytes)
 };
 #pragma pack(pop)
 
-const int HEADER_SIZE = sizeof(CustomHeader);  // Should be 13 bytes
+const int HEADER_SIZE = sizeof(CustomHeader);  // Should be 13 bytes because of 1-byte alignment.
 
 // Function that will be used so that the client can set a custom header everytime.
 int getValidatedFlag(const string &flagName) {
