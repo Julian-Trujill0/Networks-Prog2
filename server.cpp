@@ -7,7 +7,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 using namespace std;
-// Force 1-byte alignment (no padding)
+
+// Force 1-byte alignment 
 #pragma pack(push, 1)
 struct CustomHeader {
     uint16_t srcPort;     // Source Port (2 bytes)
@@ -20,9 +21,8 @@ struct CustomHeader {
 };
 #pragma pack(pop)
 
-const int HEADER_SIZE = sizeof(CustomHeader);  // Should be 13 bytes
+const int HEADER_SIZE = sizeof(CustomHeader); 
 
-// Helper function to receive an exact number of bytes
 ssize_t recv_all(int sock, char *buffer, size_t length) {
     size_t total = 0;
     while(total < length) {
@@ -78,7 +78,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
-    // Listen for incoming connection (single-client model)
+    // Listen for incoming connection
     if (listen(server_fd, 1) < 0) {
         perror("listen");
         close(server_fd);
@@ -92,18 +92,17 @@ int main() {
         close(server_fd);
         exit(EXIT_FAILURE);
     }
-    cout << "Accepted connection from " << inet_ntoa(address.sin_addr) << endl;
+    cout << "Client connected at " << inet_ntoa(address.sin_addr) << endl;
     
     while (true) {
         CustomHeader header;
-        // Receive the header (exactly 13 bytes)
+        // Receive the header 
         ssize_t n = recv_all(client_fd, reinterpret_cast<char*>(&header), HEADER_SIZE);
         if(n <= 0) {
             cout << "Client disconnected or error in receiving header." << endl;
             break;
         }
         
-        // Convert multi-byte fields from network to host byte order.
         header.srcPort = ntohs(header.srcPort);
         header.destPort = ntohs(header.destPort);
         header.seqNum  = ntohl(header.seqNum);
@@ -118,7 +117,7 @@ int main() {
         cout << "  FIN Flag: "     << static_cast<int>(header.finFlag) << endl;
         cout << "  Payload Size: " << header.payloadSize << endl;
         
-        // Receive the payload, if any
+        // Receive the payload
         string payload;
         if (header.payloadSize > 0) {
             char *payloadBuffer = new char[header.payloadSize];
@@ -130,13 +129,13 @@ int main() {
             }
             payload.assign(payloadBuffer, header.payloadSize);
             delete[] payloadBuffer;
-            cout << "Received payload: " << payload << endl;
+            cout << "Client Says"< endl;
         }
         
-        // Prepare response based on header flags.
+        // Response based on header flags.
         string response = get_response(header);
         
-        // Send the response as a simple textual message.
+        // Send the response
         if (send(client_fd, response.c_str(), response.size(), 0) == -1) {
             perror("send");
             break;
