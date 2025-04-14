@@ -1,4 +1,4 @@
-// client.cpp
+/// client.cpp
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-// Force 1-byte alignment
+// Force 1-byte alignment for the custom header.
 #pragma pack(push, 1)
 struct CustomHeader {
     uint16_t srcPort;     // Source Port (2 bytes)
@@ -22,13 +22,26 @@ struct CustomHeader {
 
 const int HEADER_SIZE = sizeof(CustomHeader);  // Should be 13 bytes
 
+// A helper function to get and validate a binary flag (0 or 1)
+int getValidatedFlag(const std::string &flagName) {
+    int value;
+    while (true) {
+        std::cout << "Enter " << flagName << " (0 or 1): ";
+        std::cin >> value;
+        if (value == 0 || value == 1)
+            break;
+        std::cout << "Invalid input. " << flagName << " must be 0 or 1." << std::endl;
+    }
+    return value;
+}
+
 int main() {
     const char* serverIP = "127.0.0.1";
     const int serverPort = 12345;
     int sock = 0;
     struct sockaddr_in serv_addr;
     
-    // Create socket.
+    // Create a socket.
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         std::cerr << "Socket creation error" << std::endl;
         exit(EXIT_FAILURE);
@@ -49,48 +62,65 @@ int main() {
         exit(EXIT_FAILURE);
     }
     std::cout << "Connected to server " << serverIP << ":" << serverPort << std::endl;
+
+    // Prompt the user for header values.
+    uint16_t srcPort;
+    std::cout << "Enter source port (client-side port number): ";
+    std::cin >> srcPort;
     
-    // Prepare header values.
-    CustomHeader header;
-    header.srcPort = htons(5000);         // Arbitrary client port
-    header.destPort = htons(serverPort);    // Server's listening port
-    header.seqNum = htonl(1);               // Example sequence number
+    // destination port is assumed to be the server's listening port.
+    uint16_t destPort = serverPort;
     
-    // Set flag values for testing.
-    // For example, set SYN flag to 1 (and ACK, FIN to 0)
-    header.ackFlag = 0;
-    header.synFlag = 1;
-    header.finFlag = 0;
+    uint32_t seqNum;
+    std::cout << "Enter sequence number: ";
+    std::cin >> seqNum;
     
+    // For the flag fields, use the helper function to ensure value is either 0 or 1.
+    int ackFlag = getValidatedFlag("ACK flag");
+    int synFlag = getValidatedFlag("SYN flag");
+    int finFlag = getValidatedFlag("FIN flag");
+
     // Prepare payload.
-    std::string payload = "Hello from client";
-    header.payloadSize = htons(payload.size());
+    std::string payload;
+    std::cout << "Enter payload (as a string): ";
+    std::cin.ignore(); // Clear newline leftover in input stream.
+    std::getline(std::cin, payload);
     
-    // Send header and payload as a single message.
-    // Note: Since our header is already in network order where applicable, we can send it directly.
-    if (send(sock, &header, HEADER_SIZE, 0) != HEADER_SIZE) {
-        std::cerr << "Failed to send header" << std::endl;
+    uint16_t payloadSize = payload.size();
+    
+    // Prepare the header. Convert multi-byte fields to network byte order.
+    CustomHeader header;
+    header.srcPort = htons(srcPort);
+    header.destPort = htons(destPort);
+    header.seqNum = htonl(seqNum);
+    header.ackFlag = ackFlag;
+    header.synFlag = synFlag;
+    header.finFlag = finFlag;
+    header.payloadSize = htons(payloadSize);
+    
+    // Combine header and payload.
+    char buffer[HEADER_SIZE + payload.size()];
+    memcpy(buffer, &header, HEADER_SIZE);
+    memcpy(buffer + HEADER_SIZE, payload.c_str(), payloadSize);
+    
+    // Send header + payload in one message.
+    ssize_t totalSize = HEADER_SIZE + payloadSize;
+    if (send(sock, buffer, totalSize, 0) != totalSize) {
+        std::cerr << "Failed to send complete message" << std::endl;
         close(sock);
         exit(EXIT_FAILURE);
     }
-    if (!payload.empty()) {
-        if (send(sock, payload.c_str(), payload.size(), 0) != (ssize_t)payload.size()) {
-            std::cerr << "Failed to send payload" << std::endl;
-            close(sock);
-            exit(EXIT_FAILURE);
-        }
-    }
     std::cout << "Sent message: header (" << HEADER_SIZE << " bytes) + payload (" 
-              << payload.size() << " bytes)" << std::endl;
+              << payloadSize << " bytes)" << std::endl;
     
     // Receive and display the server's response.
-    char buffer[1024] = {0};
-    ssize_t n = recv(sock, buffer, sizeof(buffer) - 1, 0);
+    char responseBuffer[1024] = {0};
+    ssize_t n = recv(sock, responseBuffer, sizeof(responseBuffer) - 1, 0);
     if (n > 0) {
-        std::string response(buffer, n);
+        std::string response(responseBuffer, n);
         std::cout << "Server response: " << response << std::endl;
     } else {
-        std::cout << "No response received or error occurred." << std::endl;
+        std::cout << "No response received or an error occurred." << std::endl;
     }
     
     close(sock);
